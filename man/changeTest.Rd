@@ -4,8 +4,8 @@
 \alias{changeTest}
 \title{A test showing whether two datasets have similar linear structure}
 \usage{
-changeTest(x1, y1, x2, y2, l = NULL, kappa = 1000, trustLevel = 0.05,
-  gamma = 0.5)
+changeTest(x1, y1, x2, y2, l = NULL, R = 1000, pzero = 0.05,
+  alpha = 1)
 }
 \arguments{
 \item{x1}{matrix of first period regressors with variables in columns and observations in rows}
@@ -18,17 +18,17 @@ changeTest(x1, y1, x2, y2, l = NULL, kappa = 1000, trustLevel = 0.05,
 
 \item{l}{approximate number of contributing variables (default: overall number of regressors)}
 
-\item{kappa}{number of bootstrap rounds (default: `1000`)}
+\item{R}{number of bootstrap rounds (default: `1000`)}
 
-\item{trustLevel}{trust level for bootstrap (default: `0.05`)}
+\item{pzero}{trust level for bootstrap (default: `0.05`)}
 
-\item{gamma}{tao reduction rate (default: `0.5`)}
+\item{alpha}{parameter for energy distance formula (default: `1`)}
 }
 \value{
 \code{TRUE} or \code{FALSE}
 }
 \description{
-The function performs a nonparametric test showing whether two datasets have similar linear structure or not. The test is based on applying energy distance \insertCite{rizzo-szekely10}{changedetection} to residuals estimated for each dataset separately but only by one model (either first or second). It is implemented as a permutation test with \code{kappa} rounds and corresponding \code{trustLevel} \insertCite{gorskikh17}{changedetection}.
+The function performs a nonparametric test showing whether two datasets have similar linear structure or not. The test is based on applying energy distance \insertCite{rizzo-szekely10}{changedetection} to residuals estimated for each dataset separately but only by one model (either first or second). It is implemented as a permutation test with \code{R} rounds and corresponding \code{pzero} \insertCite{gorskikh17}{changedetection}.
 }
 \examples{
 T<-60
@@ -43,7 +43,7 @@ testResult <- changeTest(x1=as.data.frame(x[1:T]),
                          y1=as.data.frame(y[1:T]),
                          x2=as.data.frame(x[31:T]),
                          y2=as.data.frame(y[31:T]),
-                         kappa=100)
+                         R=200)
 
 }
 \references{

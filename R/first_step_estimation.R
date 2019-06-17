@@ -7,24 +7,30 @@
 
 getInitialFlags <- function(dataset, settings){
 
-  tao <-settings$tao
+  tau <-settings$tau
 
-  #estimate valuable variables for the whole dtaset per each period separately
-  settings$variables <- estimateValuableVariables(dataset,settings)
   flags = rep(FALSE,settings$numberOfPeriods-1)
   stats = rep(0.0,settings$numberOfPeriods-1)
 
   # assess the statistics flags for all neighbour pairs of periods
   for (i in 1:(settings$numberOfPeriods-1))
   {
-    left <- dataset[((i-1)*tao+1):(i*tao),settings$variables[[i]]]
-    right <- dataset[(i*tao+1):((i+1)*tao),settings$variables[[i]]]
+    left <- dataset[((i-1)*tau+1):(i*tau),]
+    variables<-getVariableIndexes(left,settings)
+    cat(c(" variables: ", paste(variables,sep=" "),"\n"))
+    if (10*length(variables)>settings$tau)
+      stop(c("Number of contributing variables is too large for the chosen tau (minimum length of a regime). You may 1) select tau to be at least ",10*length(variables)," or 2) restrict the number of contributing variables by selecting parameter l to be <= ", settings$tau/10))
+    # add responses
+    variables<-c(1:settings$q,variables+settings$q)
+
+    left <- dataset[((i-1)*tau+1):(i*tau),variables]
+    right <- dataset[(i*tau+1):((i+1)*tau),variables]
 
     flags[i] <- calculateNPTestResult(left, right, settings)
     stats[i] <- calculateEnergyDistance(left, right, settings)
 
 
-    #cat(c("Periods [",(i-1)*tao+1,i*tao,"] and [",i*tao+1,(i+1)*tao,"], Flag=",flags[i],"; StatValue=",stats[i],"\n"))
+    #cat(c("Periods [",(i-1)*tau+1,i*tau,"] and [",i*tau+1,(i+1)*tau,"], Flag=",flags[i],"; StatValue=",stats[i],"\n"))
   }
 
   # exclude excess flags
@@ -54,20 +60,20 @@ getInitialFlags <- function(dataset, settings){
 getResponseIndexes <- function(dataset,changes,settings)
 {
   result <- vector()
-  tao <- settings$tao
+  tau <- settings$tau
 
   for (i in 1:(length(changes)))
   {
     # get updated left hand variable indexes
-    left = dataset[(changes[i]*tao - tao):(changes[i]*tao-1),]
+    left = dataset[(changes[i]*tau - tau):(changes[i]*tau-1),]
 
     #update valuable variables
-    indexes<-getVariableIndexes(left,settings)
-    variables <- c(1:settings$q,indexes+settings$q)
+    variables <- getVariableIndexes(left,settings)
+    variables <- c(1:settings$q,variables+settings$q)
 
     # cut relevant data pieces
-    left = dataset[(changes[i]*tao - tao):(changes[i]*tao-1),variables]
-    right = dataset[(changes[i]*tao):(changes[i]*tao+tao),variables]
+    left = dataset[(changes[i]*tau - tau):(changes[i]*tau-1),variables]
+    right = dataset[(changes[i]*tau):(changes[i]*tau+tau),variables]
     stats = rep(0.0,settings$q)
 
     for (j in 1:settings$q)
@@ -81,29 +87,3 @@ getResponseIndexes <- function(dataset,changes,settings)
   return (result)
 }
 
-#estimate valuable variables for the whole dtaset per each period separately
-estimateValuableVariables <- function(dataset, settings)
-{
-  cat("Variable selection step \n")
-  finalIndexes <- NULL
-  tao <- settings$tao
-
-  variables <- vector("list", length = settings$numberOfPeriods)
-
-  for (i in 1:settings$numberOfPeriods)
-  {
-    cat(c("Period ",i,"[",((i-1)*tao+1),",",(i*tao),"]:"))
-
-    left = dataset[((i-1)*tao+1):(i*tao),]
-
-    indexes<-getVariableIndexes(left,settings)
-    cat(c(" variables: ", paste(indexes,sep=" "),"\n"))
-
-    # add response indexes to the final set of variables
-    variables[[i]] <- c(1:settings$q,indexes+settings$q)
-
-  }
-
-  return (variables)
-
-}

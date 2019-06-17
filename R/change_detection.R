@@ -1,5 +1,5 @@
 
-#' A list of change locations occured in the structure having given responses and regresors
+#' A list of change locations occured in the structure having given responses `y` and regressors `x`
 #'
 #' @description The main function of the package which estimates a set of structural change points for a dataset following multivariate (or univariate) linear model.
 #'
@@ -15,10 +15,11 @@
 #' @param x matrix of regressors with variables in columns and observations in rows
 #' @param y matrix of responses with variables in columns and observations in rows
 #' @param l approximate number of contributing variables (default: overall number of regressors)
-#' @param tao length of splitting periods (default: l*10, which is dictated by The general rule of thumb \insertCite{Harrell}{changedetection})
-#' @param kappa number of bootstrap rounds (default: `1000`)
-#' @param trustLevel trust level for bootstrap (default: `0.05`)
-#' @param gamma tao reduction rate (default: `0.5`)
+#' @param tau length of splitting periods (default: l*10, which is dictated by The general rule of thumb \insertCite{Harrell}{changedetection})
+#' @param R number of bootstrap rounds (default: `1000`)
+#' @param pzero trust level for bootstrap (default: `0.05`)
+#' @param gamma tau reduction rate used in NSA (default: `0.5`)
+#' @param alpha parameter for energy distance formula (default: `1`)
 #' @return A set of change locations indexes \code{changes}.
 #' @examples
 #' T<-60
@@ -31,14 +32,14 @@
 #'
 #' changes(x=as.data.frame(x),
 #'         y=as.data.frame(y),
-#'         tao=20, kappa=100)
+#'         tau=20, R=100)
 #'
 #' @references
 #'     \insertAllCited
 #' @export
 
 
-changes <-function(x, y, tao=NULL, l=NULL, kappa=1000, trustLevel=0.05, gamma=0.5){
+changes <-function(x, y, tau=NULL, l=NULL, R=1000, pzero=0.05, gamma=0.5, alpha=1){
 
   if(is.null(x)||nrow(x)==0)
     stop("x is missing or empty")
@@ -49,24 +50,25 @@ changes <-function(x, y, tao=NULL, l=NULL, kappa=1000, trustLevel=0.05, gamma=0.
   if (nrow(x)!=nrow(y))
     stop("x and y have different number of rows")
 
-  settings <- getDefaultSettings(cbind(y,x), ncol(y), tao=tao, l=l, kappa=kappa, trustLevel=trustLevel, gamma=gamma)
+  settings <- getDefaultSettings(cbind(y,x), ncol(y), tau=tau, l=l, R=R, pzero=pzero, gamma=gamma, alpha=alpha)
   changes <- runDetection(cbind(y,x), settings)
   return (changes)
 
 }
 
-# Get a list of change locations, occured in the structure having responses `y` and regresors `x`
+# Get a list of change locations, occured in the structure having given responses `y` and regressors `x`
 #
 # @param dataset a matrix having responses as first columns and regressors as all the rest (the only required argument)
 # @param q dimensionality of a response (`1` stands for univariate, `2` for bivariate etc.) (default: `1`)
 # @param l approximate number of contributing variables (default : overall number of regressors)
-# @param tao length of splitting periods (default: l*10, which is dictated by The general rule of thumb (Frank Harrell, Regression Modeling Strategies))
-# @param kappa number of bootstrap rounds (default: `1000`)
-# @param trustLevel trust level for bootstrap (default: `0.05`)
-# @param gamma tao reduction rate (default: `0.5`)
+# @param tau length of splitting periods (default: l*10, which is dictated by The general rule of thumb (Frank Harrell, Regression Modeling Strategies))
+# @param R number of bootstrap rounds (default: `1000`)
+# @param pzero trust level for bootstrap (default: `0.05`)
+# @param gamma tau reduction rate (default: `0.5`)
+# @param alpha parameter for energy distance (default: `1`)
 #
 # @return A list containing algo settings \code{settings}.
-getDefaultSettings <- function(dataset=NULL, q=NULL, l=NULL, tao=NULL, kappa=1000, trustLevel=0.05, gamma=0.5){
+getDefaultSettings <- function(dataset=NULL, q=NULL, l=NULL, tau=NULL, R=1000, pzero=0.05, gamma=0.5, alpha=1){
 
   if(is.null(dataset)||length(dataset)==0)
     stop("dataset cannot be empty")
@@ -80,21 +82,23 @@ getDefaultSettings <- function(dataset=NULL, q=NULL, l=NULL, tao=NULL, kappa=100
   # number of contributing variables
   ifelse(is.null(l), settings$l <- (ncol(dataset)-settings$q), settings$l <- l)
 
-  # check tao (min length of a period)
-  if(is.null(tao)) tao <- 10*settings$l # from The general rule of thumb (Frank Harrell, Regression Modeling Strategies
-  if(tao < 1) tao <- floor(nrow(dataset)*tao)
-  if(tao <= settings$l)
+  # check tau (min length of a period)
+  if(is.null(tau)) tau <- 10*settings$l # from The general rule of thumb (Frank Harrell, Regression Modeling Strategies
+  if(tau < 1) tau <- floor(nrow(dataset)*tau)
+  if(tau <= settings$l)
     stop("minimum period length must be greater than the number of regressors")
-  if(tao > floor(nrow(dataset)/2))
+  if(tau > floor(nrow(dataset)/2))
     stop("minimum period length must be smaller than half of the number of observations")
-  settings$tao <- tao
+  settings$tau <- tau
 
   # number of bootstrap rounds
-  settings$kappa <- kappa
+  settings$R <- R
   # trust level for bootstrap
-  settings$trustLevel <- trustLevel
-  # tao reduction rate
+  settings$pzero <- pzero
+  # tau reduction rate
   settings$gamma <- gamma
+  # alpha for energy distance
+  settings$alpha <- alpha
 
   return (settings)
 }
@@ -104,7 +108,7 @@ runDetection <- function(dataset, settings){
   # data length
   T <- length(dataset[,1])
   # number of periods to observe
-  settings$numberOfPeriods <- round(T/settings$tao)
+  settings$numberOfPeriods <- round(T/settings$tau)
   cat("Number of periods = ",settings$numberOfPeriods,"\n")
 
   # first step estimation
@@ -124,11 +128,12 @@ runDetection <- function(dataset, settings){
     cat("Response indexes = ",responseIndexes,"\n")
     # second step estimation
     finalChanges <- rep(0.0,settings$numberOfChanges)
+
     for (i in 1:settings$numberOfChanges){
-      start <- (changeIndexes[i]-1)*settings$tao +1
-      end <- (changeIndexes[i]+1)*settings$tao
+      start <- (changeIndexes[i]-1)*settings$tau +1
+      end <- (changeIndexes[i]+1)*settings$tau
       cat("Consider period [",start,",",end,"]\n")
-      finalChanges[i] <- recursiveDetection(dataset, start, end, floor(settings$tao*settings$gamma), responseIndexes[i],settings)
+      finalChanges[i] <- recursiveDetection(dataset, start, end, floor(settings$tau*settings$gamma), responseIndexes[i],settings)
     }
 
     cat("Final change points = ",finalChanges,"\n")

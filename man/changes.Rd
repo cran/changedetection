@@ -2,25 +2,27 @@
 % Please edit documentation in R/change_detection.R
 \name{changes}
 \alias{changes}
-\title{A list of change locations occured in the structure having given responses and regresors}
+\title{A list of change locations occured in the structure having given responses `y` and regressors `x`}
 \usage{
-changes(x, y, tao = NULL, l = NULL, kappa = 1000, trustLevel = 0.05,
-  gamma = 0.5)
+changes(x, y, tau = NULL, l = NULL, R = 1000, pzero = 0.05,
+  gamma = 0.5, alpha = 1)
 }
 \arguments{
 \item{x}{matrix of regressors with variables in columns and observations in rows}
 
 \item{y}{matrix of responses with variables in columns and observations in rows}
 
-\item{tao}{length of splitting periods (default: l*10, which is dictated by The general rule of thumb \insertCite{Harrell}{changedetection})}
+\item{tau}{length of splitting periods (default: l*10, which is dictated by The general rule of thumb \insertCite{Harrell}{changedetection})}
 
 \item{l}{approximate number of contributing variables (default: overall number of regressors)}
 
-\item{kappa}{number of bootstrap rounds (default: `1000`)}
+\item{R}{number of bootstrap rounds (default: `1000`)}
 
-\item{trustLevel}{trust level for bootstrap (default: `0.05`)}
+\item{pzero}{trust level for bootstrap (default: `0.05`)}
 
-\item{gamma}{tao reduction rate (default: `0.5`)}
+\item{gamma}{tau reduction rate used in NSA (default: `0.5`)}
+
+\item{alpha}{parameter for energy distance formula (default: `1`)}
 }
 \value{
 A set of change locations indexes \code{changes}.
@@ -47,7 +49,7 @@ y<-c(y1,y2)
 
 changes(x=as.data.frame(x),
         y=as.data.frame(y),
-        tao=20, kappa=100)
+        tau=20, R=100)
 
 }
 \references{

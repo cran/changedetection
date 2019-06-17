@@ -1,15 +1,15 @@
 #' A test showing whether two datasets have similar linear structure
 #'
-#' @description The function performs a nonparametric test showing whether two datasets have similar linear structure or not. The test is based on applying energy distance \insertCite{rizzo-szekely10}{changedetection} to residuals estimated for each dataset separately but only by one model (either first or second). It is implemented as a permutation test with \code{kappa} rounds and corresponding \code{trustLevel} \insertCite{gorskikh17}{changedetection}.
+#' @description The function performs a nonparametric test showing whether two datasets have similar linear structure or not. The test is based on applying energy distance \insertCite{rizzo-szekely10}{changedetection} to residuals estimated for each dataset separately but only by one model (either first or second). It is implemented as a permutation test with \code{R} rounds and corresponding \code{pzero} \insertCite{gorskikh17}{changedetection}.
 #'
 #' @param x1 matrix of first period regressors with variables in columns and observations in rows
 #' @param y1 matrix of first period responses with variables in columns and observations in rows
 #' @param x2 matrix of second period regressors with variables in columns and observations in rows
 #' @param y2 matrix of second period responses with variables in columns and observations in rows
 #' @param l approximate number of contributing variables (default: overall number of regressors)
-#' @param kappa number of bootstrap rounds (default: `1000`)
-#' @param trustLevel trust level for bootstrap (default: `0.05`)
-#' @param gamma tao reduction rate (default: `0.5`)
+#' @param R number of bootstrap rounds (default: `1000`)
+#' @param pzero trust level for bootstrap (default: `0.05`)
+#' @param alpha parameter for energy distance formula (default: `1`)
 #' @return \code{TRUE} or \code{FALSE}
 #' @examples
 #' T<-60
@@ -24,12 +24,12 @@
 #'                          y1=as.data.frame(y[1:T]),
 #'                          x2=as.data.frame(x[31:T]),
 #'                          y2=as.data.frame(y[31:T]),
-#'                          kappa=100)
+#'                          R=200)
 #'
 #' @references
 #'     \insertAllCited
 #' @export
-changeTest<-function(x1, y1, x2, y2,l=NULL, kappa=1000, trustLevel=0.05, gamma=0.5)
+changeTest<-function(x1, y1, x2, y2,l=NULL, R=1000, pzero=0.05, alpha=1)
 {
   if(is.null(x1)||length(x1)==0)
     stop("x1 is missing or empty")
@@ -53,7 +53,7 @@ changeTest<-function(x1, y1, x2, y2,l=NULL, kappa=1000, trustLevel=0.05, gamma=0
 
   firstDataset <- cbind(y1,x1)
   secondDataset <- cbind(y2,x2)
-  settings <- getDefaultSettings(firstDataset, ncol(y1), l=l, kappa=kappa, trustLevel=trustLevel, gamma=gamma)
+  settings <- getDefaultSettings(firstDataset, ncol(y1), l=l, R=R, pzero=pzero, alpha=alpha)
 
   # if variable selection needed
   if (settings$l<ncol(x1))
@@ -85,6 +85,7 @@ changeTest<-function(x1, y1, x2, y2,l=NULL, kappa=1000, trustLevel=0.05, gamma=0
 #' @param x2 matrix of second period regressors with variables in columns and observations in rows
 #' @param y2 matrix of second period responses with variables in columns and observations in rows
 #' @param l approximate number of contributing variables (default: overall number of regressors)
+#' @param alpha parameter for energy distance formula (default: `1`)
 #' @return energy distance value
 #' @examples
 #' T<-60
@@ -95,15 +96,15 @@ changeTest<-function(x1, y1, x2, y2,l=NULL, kappa=1000, trustLevel=0.05, gamma=0
 #' y2<--2*x[change:T]+e[change:T]
 #' y<-c(y1,y2)
 #'
-#' eDistance <- eDistance(x1=as.data.frame(x[1:30]),
-#'                        y1=as.data.frame(y[1:30]),
-#'                        x2=as.data.frame(x[31:T]),
-#'                        y2=as.data.frame(y[31:T]))
+#' ed <- energyDistance(x1=as.data.frame(x[1:30]),
+#'                      y1=as.data.frame(y[1:30]),
+#'                      x2=as.data.frame(x[31:T]),
+#'                      y2=as.data.frame(y[31:T]))
 #'
 #' @references
 #'     \insertAllCited
 #' @export
-eDistance<-function(x1, y1, x2, y2,l=NULL)
+energyDistance<-function(x1, y1, x2, y2,l=NULL,alpha=1)
 {
   if(is.null(x1)||length(x1)==0)
     stop("x1 is missing or empty")
@@ -127,7 +128,7 @@ eDistance<-function(x1, y1, x2, y2,l=NULL)
 
   firstDataset <- cbind(y1,x1)
   secondDataset <- cbind(y2,x2)
-  settings <- getDefaultSettings(firstDataset, ncol(y1), l)
+  settings <- getDefaultSettings(firstDataset, ncol(y1), l=l, alpha=alpha)
 
   # if variable selection needed
   if (settings$l<ncol(x1))
@@ -147,7 +148,7 @@ eDistance<-function(x1, y1, x2, y2,l=NULL)
 
 }
 
-# Calculate whether two datssets have the same structure.
+# Calculate whether two datasets have the same structure.
 #
 # @param firstDataset first dataset (data.frame) having responses as first columns and regressors as all the rest
 # @param secondDataset second dataset (data.frame) having responses as first columns and regressors as all the rest
@@ -165,7 +166,7 @@ calculateNPTestResult<-function(firstDataset, secondDataset, settings)
   firstRes = getResidualsMultivariate(firstDataset, models, settings)
   secondRes = getResidualsMultivariate(secondDataset, models, settings)
 
-  differences = getMatrixOfDifferences(firstRes, secondRes)
+  differences = getMatrixOfDifferences(firstRes, secondRes,settings)
 
   result = calculateStatistics(differences, length(firstDataset[,1]), length(secondDataset[,1]), settings)
 
@@ -202,7 +203,7 @@ calculateEnergyDistance <- function (firstDataset,secondDataset,settings,i=NULL)
     secondRes = getResidualsUnivariate(secondDataset,model,i,settings)
   }
 
-  differences = getMatrixOfDifferences(firstRes, secondRes)
+  differences = getMatrixOfDifferences(firstRes, secondRes,settings)
   indexes = getIndexes(length(firstDataset[,1])+length(secondDataset[,1]), length(firstDataset[,1]), TRUE)
   sums = getArrayOfSums(differences, indexes)
 
@@ -224,14 +225,14 @@ calculateEnergyDistance <- function (firstDataset,secondDataset,settings,i=NULL)
 calculateStatistics <- function(differences, firstAmount, secondAmount, settings)
 {
   n = length(differences[1,])
-  flags = rep(0.0, times = settings$kappa)
+  flags = rep(0.0, times = settings$R)
 
   indexes = getIndexes(n, firstAmount, TRUE)
   sums = getArrayOfSums(differences, indexes)
   value = calculateStatisticsValue(sums, firstAmount,secondAmount)
   flags[1] = value
 
-  for (i in 2:settings$kappa)
+  for (i in 2:settings$R)
   {
     indexes = getIndexes(n, firstAmount, FALSE)
 
@@ -245,7 +246,7 @@ calculateStatistics <- function(differences, firstAmount, secondAmount, settings
 
   flags = sort(flags, decreasing = TRUE)
 
-  boundary = ceiling(settings$kappa*settings$trustLevel)
+  boundary = ceiling(settings$R*settings$pzero)
 
   isLeading = (flags[boundary]<initialStat)
 
@@ -351,7 +352,7 @@ getIndexes <- function (n, m, flag)
 # @param y vector of second residuals.
 # @return matrix of differences between \code{x} and \code{y}
 #
-getMatrixOfDifferences<-function(x, y)
+getMatrixOfDifferences<-function(x, y, settings)
 {
   n <- length(x) + length(y)
   firstAmount <- length(x)
@@ -363,17 +364,17 @@ getMatrixOfDifferences<-function(x, y)
     if (i <= firstAmount){ # First horizontal part
       for (j in 1:n){
         if (j <= firstAmount){ # First vertical part
-          result[i,j] <- abs(x[i] - x[j])/2
+          result[i,j] <- abs(x[i] - x[j])^settings$alpha/2
         } else {
-          result[i,j] <- abs(x[i] - y[j-firstAmount])/2
+          result[i,j] <- abs(x[i] - y[j-firstAmount])^settings$alpha/2
         }
       }
     } else { # Second horizontal part
       for (j in 1:n){
         if (j <= firstAmount){ # First vertical part
-            result[i,j] <- abs(x[j] - y[i - firstAmount])/2
+            result[i,j] <- abs(x[j] - y[i - firstAmount])^settings$alpha/2
         } else {
-          result[i,j] <- abs(y[j-firstAmount] - y[i-firstAmount])/2
+          result[i,j] <- abs(y[j-firstAmount] - y[i-firstAmount])^settings$alpha/2
         }
       }
     }

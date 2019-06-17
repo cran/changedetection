@@ -71,12 +71,13 @@ changingModel <-function(x,y,changes,l=NULL)
 
 #' Moving energy distance
 #'
-#' @description Estimates energy distance \insertCite{rizzo-szekely10}{changedetection} for each point starting from \code{tao+1} to \code{T-tao}, where \code{T} is a data length. In these terms, energy distance for a point means energy distance between the dataset containing \code{tao} observations to the left and the dataset containing \code{tao} observations to the right of the original point. Hence, we are considering a so-called 'moving frame' of length \code{2tao}. The resulting array shows how the energy distance behaves along the period to analyze.
+#' @description Estimates energy distance \insertCite{rizzo-szekely10}{changedetection} for each point starting from \code{tau+1} to \code{T-tau}, where \code{T} is a data length. In these terms, energy distance for a point means energy distance between the dataset containing \code{tau} observations to the left and the dataset containing \code{tau} observations to the right of the original point. Hence, we are considering a so-called 'moving frame' of length \code{2tau}. The resulting array shows how the energy distance behaves along the period to analyze.
 #' @param x matrix of regressors with variables in columns and observations in rows
 #' @param y matrix of responses with variables in columns and observations in rows
 #' @param l approximate number of contributing variables (Default : overall number of regressors)
-#' @param tao length of a splitting period (Default: l*10, which is dictated by The general rule of thumb \insertCite{Harrell}{changedetection})
-#' @return a list of energy distnce values for pairs of adjacent data segments of length tao (moving-frame construction)
+#' @param tau length of a splitting period (Default: l*10, which is dictated by The general rule of thumb \insertCite{Harrell}{changedetection})
+#' @param alpha parameter for energy distance formula (default: `1`)
+#' @return a list of energy distnce values for pairs of adjacent data segments of length tau (moving-frame construction)
 #' @examples
 #' T<-60
 #' change<-35
@@ -86,12 +87,12 @@ changingModel <-function(x,y,changes,l=NULL)
 #' y2<--2*x[change:T]+e[change:T]
 #' y<-c(y1,y2)
 #'
-#' movingEDistance <- movingEDistance(x=as.data.frame(x),
-#'                                    y=as.data.frame(y))
+#' med <- movingEnergyDistance(x=as.data.frame(x),
+#'                             y=as.data.frame(y))
 #' @references
 #'     \insertAllCited
 #' @export
-movingEDistance <- function(x,y,l=NULL,tao=NULL)
+movingEnergyDistance <- function(x,y,l=NULL,tau=NULL,alpha=1)
 {
   if(is.null(x)||length(x)==0)
     stop("x is missing or empty")
@@ -103,20 +104,20 @@ movingEDistance <- function(x,y,l=NULL,tao=NULL)
     stop("x and y have different number of rows")
 
   dataset <- cbind(y,x)
-  settings <- getDefaultSettings(dataset, q=ncol(y), tao = tao, l=l)
+  settings <- getDefaultSettings(dataset, q=ncol(y), tau = tau, l=l, alpha=alpha)
 
   result=vector()
 
-  for (i in (settings$tao+1):(length(dataset[,1])-settings$tao))
+  for (i in (settings$tau+1):(length(dataset[,1])-settings$tau))
   {
     # get contributing variables
-    datapiece <- dataset[((i-settings$tao):(i-1)),]
+    datapiece <- dataset[((i-settings$tau):(i-1)),]
 
     indexes<-getVariableIndexes(datapiece,settings)
     variables <- c(1:settings$q,indexes+settings$q)
 
-    left = dataset[(i-settings$tao):(i-1),variables]
-    right = dataset[(i:(i+settings$tao-1)),variables]
+    left = dataset[(i-settings$tau):(i-1),variables]
+    right = dataset[(i:(i+settings$tau-1)),variables]
     value = calculateEnergyDistance(left,right,settings)
 
     result= c(result,value)
